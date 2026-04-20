@@ -2,6 +2,7 @@
   "name": "zendesk-mcp-server",
   "version": "1.0.0",
   "description": "Remote MCP server for the Zendesk Help Center API",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "build": "tsc",
