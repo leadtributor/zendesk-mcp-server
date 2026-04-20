@@ -52,10 +52,18 @@ oauthRouter.post('/register', express.json(), (req, res) => {
   });
 });
 
+function str(v: unknown): string {
+  return typeof v === 'string' ? v : '';
+}
+
 // Authorization endpoint — show Zendesk credential form
 oauthRouter.get('/authorize', (req, res) => {
-  const { client_id, redirect_uri, state, code_challenge, code_challenge_method, response_type } =
-    req.query as Record<string, string>;
+  const client_id = str(req.query.client_id);
+  const redirect_uri = str(req.query.redirect_uri);
+  const state = str(req.query.state);
+  const code_challenge = str(req.query.code_challenge);
+  const code_challenge_method = str(req.query.code_challenge_method);
+  const response_type = str(req.query.response_type);
 
   if (response_type !== 'code') {
     res.status(400).send('Unsupported response_type');
@@ -125,8 +133,14 @@ oauthRouter.post(
   '/authorize',
   express.urlencoded({ extended: false }),
   (req, res) => {
-    const { client_id, redirect_uri, state, code_challenge, code_challenge_method, subdomain, email, token } =
-      req.body as Record<string, string>;
+    const client_id = str(req.body.client_id);
+    const redirect_uri = str(req.body.redirect_uri);
+    const state = str(req.body.state);
+    const code_challenge = str(req.body.code_challenge);
+    const code_challenge_method = str(req.body.code_challenge_method);
+    const subdomain = str(req.body.subdomain);
+    const email = str(req.body.email);
+    const token = str(req.body.token);
 
     if (!subdomain || !email || !token || !redirect_uri) {
       res.status(400).send('Fehlende Pflichtfelder.');
@@ -153,7 +167,10 @@ oauthRouter.post(
 
 // Token endpoint — exchange code for access token
 oauthRouter.post('/token', express.urlencoded({ extended: false }), express.json(), async (req, res) => {
-  const { grant_type, code, redirect_uri, code_verifier } = req.body as Record<string, string>;
+  const grant_type = str(req.body.grant_type);
+  const code = str(req.body.code);
+  const redirect_uri = str(req.body.redirect_uri);
+  const code_verifier = str(req.body.code_verifier);
 
   if (grant_type !== 'authorization_code') {
     res.status(400).json({ error: 'unsupported_grant_type' });

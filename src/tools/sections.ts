@@ -1,20 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { ZendeskClient } from '../zendesk-client.js';
-
-function ok(data: unknown) {
-  return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
-}
-
-function err(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error);
-  return { content: [{ type: 'text' as const, text: `Error: ${message}` }], isError: true as const };
-}
-
-function qs(params: URLSearchParams): string {
-  const s = params.toString();
-  return s ? `?${s}` : '';
-}
+import { ok, err, qs } from './utils.js';
 
 export function registerSectionTools(server: McpServer, client: ZendeskClient): void {
   server.tool(
