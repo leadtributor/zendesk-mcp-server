@@ -61,17 +61,4 @@ export class ZendeskClient {
     return response.json() as Promise<T>;
   }
 
-  async uploadToSignedUrl(signedUrl: string, data: Uint8Array, contentType: string): Promise<void> {
-    // No Authorization header — S3 signed URLs embed their own auth as query parameters
-    const response = await fetch(signedUrl, {
-      method: 'PUT',
-      headers: { 'Content-Type': contentType },
-      body: new Blob([data.buffer as ArrayBuffer], { type: contentType }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`S3 upload ${response.status} ${response.statusText}: ${errorText}`);
-    }
-  }
 }

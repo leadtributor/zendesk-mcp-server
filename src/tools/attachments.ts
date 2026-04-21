@@ -3,8 +3,6 @@ import { z } from 'zod';
 import type { ZendeskClient } from '../zendesk-client.js';
 import { ok, err } from './utils.js';
 
-const MAX_FILE_BYTES = 20 * 1024 * 1024; // 20 MB — Zendesk attachment limit
-
 export function registerAttachmentTools(server: McpServer, client: ZendeskClient): void {
   server.tool(
     'list_article_attachments',
@@ -26,64 +24,42 @@ export function registerAttachmentTools(server: McpServer, client: ZendeskClient
   );
 
   server.tool(
-    'upload_article_image',
+    'request_article_attachment_upload_url',
     [
-      'Upload an image and associate it as an inline attachment to a Help Center article.',
-      'Uses the Zendesk Guide Media API (3-step upload + association).',
-      'Returns the article_attachment object including content_url — use that URL in article HTML as <img src="{content_url}" />.',
+      'Step 1 of 2 for uploading a file to a Help Center article.',
+      'Requests a signed upload URL from Zendesk Guide Media API.',
+      'Returns upload_id and upload_url — the client must PUT the raw file bytes directly to upload_url',
+      '(no Authorization header, Content-Type must match the content_type given here).',
+      'After the PUT succeeds, call finalize_article_attachment with the upload_id to complete the process.',
     ].join(' '),
     {
-      article_id: z
+      content_type: z
+        .string()
+        .describe('MIME type of the file, e.g. "image/png" or "image/jpeg"'),
+      file_size: z
         .number()
         .int()
         .positive()
-        .describe('ID of the article to attach the image to'),
-      filename: z.string().describe('Filename including extension, e.g. "screenshot.png"'),
-      content_type: z
-        .enum(['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml'])
-        .describe('MIME type of the image'),
-      data_base64: z.string().describe('Base64-encoded image file content'),
-      locale: z.string().optional().describe('Locale for the attachment, e.g. "en-us"'),
+        .describe('File size in bytes (required by Zendesk to generate the signed URL)'),
     },
-    async ({ article_id, filename, content_type, data_base64, locale }) => {
+    async ({ content_type, file_size }) => {
       try {
-        const imageBuffer = Buffer.from(data_base64, 'base64');
-        if (imageBuffer.byteLength > MAX_FILE_BYTES) {
-          return err(
-            new Error(`File size ${imageBuffer.byteLength} bytes exceeds the 20 MB limit`),
-          );
-        }
-
-        // Step 1: Request a signed S3 upload URL from Zendesk
-        const uploadUrlResp = await client.request<{ id: string; url: string }>(
+        const resp = await client.request<{ id: string; url: string }>(
           'POST',
           '/guide/medias/upload_url',
-          { content_type, file_size: imageBuffer.byteLength },
+          { content_type, file_size },
         );
-
-        // Step 2: Upload raw binary to the S3 signed URL (no Zendesk auth header)
-        await client.uploadToSignedUrl(uploadUrlResp.url, imageBuffer, content_type);
-
-        // Step 3: Commit the upload and create a media object in Zendesk
-        const mediaResp = await client.request<{ id: string }>(
-          'POST',
-          '/guide/medias',
-          { asset_upload_id: uploadUrlResp.id, filename },
-        );
-
-        // Step 4: Associate the media object with the article as an inline attachment
-        const form = new FormData();
-        form.set('guide_media_id', String(mediaResp.id));
-        form.set('inline', 'true');
-        if (locale) form.set('locale', locale);
-
-        return ok(
-          await client.requestMultipart(
-            'POST',
-            `/help_center/articles/${article_id}/attachments`,
-            form,
-          ),
-        );
+        return ok({
+          upload_id: resp.id,
+          upload_url: resp.url,
+          content_type,
+          instructions: [
+            `PUT the raw file bytes to upload_url.`,
+            `Set Content-Type: ${content_type} on the PUT request.`,
+            `Do not send an Authorization header to the upload_url.`,
+            `Then call finalize_article_attachment with the upload_id.`,
+          ],
+        });
       } catch (e) {
         return err(e);
       }
@@ -91,43 +67,43 @@ export function registerAttachmentTools(server: McpServer, client: ZendeskClient
   );
 
   server.tool(
-    'attach_file_to_article',
+    'finalize_article_attachment',
     [
-      'Upload any file (image, PDF, document) as an attachment to a Help Center article',
-      'using a direct multipart upload.',
-      'Returns the article_attachment object including content_url.',
-      'For inline images to embed in article HTML, prefer upload_article_image instead.',
+      'Step 2 of 2 for uploading a file to a Help Center article.',
+      'Call this after the client has successfully PUT the file to the upload_url from request_article_attachment_upload_url.',
+      'Creates the Zendesk media object and associates it with the article.',
+      'Returns the article_attachment including content_url — for inline images use this URL as <img src="{content_url}" /> in the article HTML body.',
     ].join(' '),
     {
+      upload_id: z
+        .string()
+        .describe('The upload_id returned by request_article_attachment_upload_url'),
+      filename: z.string().describe('Filename including extension, e.g. "screenshot.png"'),
       article_id: z
         .number()
         .int()
         .positive()
-        .describe('ID of the article to attach the file to'),
-      filename: z.string().describe('Filename including extension, e.g. "report.pdf"'),
-      content_type: z
-        .string()
-        .describe('MIME type of the file, e.g. "application/pdf" or "image/png"'),
-      data_base64: z.string().describe('Base64-encoded file content'),
+        .describe('ID of the article to associate the attachment with'),
       inline: z
         .boolean()
         .optional()
-        .default(false)
-        .describe('Whether to embed inline in the article body (default: false)'),
+        .default(true)
+        .describe('Whether to embed inline in the article body (default: true)'),
       locale: z.string().optional().describe('Locale for the attachment, e.g. "en-us"'),
     },
-    async ({ article_id, filename, content_type, data_base64, inline, locale }) => {
+    async ({ upload_id, filename, article_id, inline, locale }) => {
       try {
-        const fileBuffer = Buffer.from(data_base64, 'base64');
-        if (fileBuffer.byteLength > MAX_FILE_BYTES) {
-          return err(
-            new Error(`File size ${fileBuffer.byteLength} bytes exceeds the 20 MB limit`),
-          );
-        }
+        // Commit the upload and create a media object
+        const mediaResp = await client.request<{ id: string }>(
+          'POST',
+          '/guide/medias',
+          { asset_upload_id: upload_id, filename },
+        );
 
+        // Associate the media object with the article
         const form = new FormData();
-        form.set('file', new Blob([fileBuffer], { type: content_type }), filename);
-        form.set('inline', String(inline ?? false));
+        form.set('guide_media_id', String(mediaResp.id));
+        form.set('inline', String(inline ?? true));
         if (locale) form.set('locale', locale);
 
         return ok(
