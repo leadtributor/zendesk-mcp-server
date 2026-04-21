@@ -77,15 +77,22 @@ export function registerArticleTools(server: McpServer, client: ZendeskClient): 
       title: z.string().describe('Article title'),
       body: z.string().describe('Article body (HTML)'),
       locale: z.string().optional().describe('Locale code (defaults to account default)'),
+      author_id: z.number().int().optional().describe('User ID of the article author'),
       draft: z.boolean().optional().describe('Save as draft (default: false)'),
       promoted: z.boolean().optional().describe('Pin article to top of section'),
       position: z.number().int().optional().describe('Position within the section'),
+      comments_disabled: z.boolean().optional().describe('Disable comments on the article'),
+      content_tag_ids: z.array(z.string()).optional().describe('Content tag IDs to attach'),
       user_segment_id: z
         .number()
         .int()
         .nullable()
         .optional()
         .describe('User segment ID for access control (null = everyone)'),
+      user_segment_ids: z
+        .array(z.number().int())
+        .optional()
+        .describe('Multiple user segment IDs for access control'),
       permission_group_id: z.number().int().optional().describe('Permission group ID'),
       label_names: z.array(z.string()).optional().describe('Labels to attach'),
     },
@@ -94,10 +101,14 @@ export function registerArticleTools(server: McpServer, client: ZendeskClient): 
       title,
       body,
       locale,
+      author_id,
       draft,
       promoted,
       position,
+      comments_disabled,
+      content_tag_ids,
       user_segment_id,
+      user_segment_ids,
       permission_group_id,
       label_names,
     }) => {
@@ -107,10 +118,14 @@ export function registerArticleTools(server: McpServer, client: ZendeskClient): 
           : `/help_center/sections/${section_id}/articles`;
 
         const article: Record<string, unknown> = { title, body };
+        if (author_id !== undefined) article.author_id = author_id;
         if (draft !== undefined) article.draft = draft;
         if (promoted !== undefined) article.promoted = promoted;
         if (position !== undefined) article.position = position;
+        if (comments_disabled !== undefined) article.comments_disabled = comments_disabled;
+        if (content_tag_ids !== undefined) article.content_tag_ids = content_tag_ids;
         if (user_segment_id !== undefined) article.user_segment_id = user_segment_id;
+        if (user_segment_ids !== undefined) article.user_segment_ids = user_segment_ids;
         if (permission_group_id !== undefined) article.permission_group_id = permission_group_id;
         if (label_names !== undefined) article.label_names = label_names;
 
@@ -126,13 +141,21 @@ export function registerArticleTools(server: McpServer, client: ZendeskClient): 
     'Update an existing Help Center article.',
     {
       article_id: z.number().int().positive().describe('Article ID'),
+      section_id: z.number().int().positive().optional().describe('Move article to a different section'),
       title: z.string().optional().describe('New title'),
       body: z.string().optional().describe('New body (HTML)'),
       locale: z.string().optional().describe('Locale of the translation to update'),
+      author_id: z.number().int().optional().describe('User ID of the article author'),
       draft: z.boolean().optional(),
       promoted: z.boolean().optional(),
       position: z.number().int().optional(),
+      comments_disabled: z.boolean().optional().describe('Disable comments on the article'),
+      content_tag_ids: z.array(z.string()).optional().describe('Content tag IDs — replaces all existing tags'),
       user_segment_id: z.number().int().nullable().optional(),
+      user_segment_ids: z
+        .array(z.number().int())
+        .optional()
+        .describe('Multiple user segment IDs for access control'),
       permission_group_id: z.number().int().optional(),
       label_names: z
         .array(z.string())
@@ -141,13 +164,18 @@ export function registerArticleTools(server: McpServer, client: ZendeskClient): 
     },
     async ({
       article_id,
+      section_id,
       title,
       body,
       locale,
+      author_id,
       draft,
       promoted,
       position,
+      comments_disabled,
+      content_tag_ids,
       user_segment_id,
+      user_segment_ids,
       permission_group_id,
       label_names,
     }) => {
@@ -157,12 +185,17 @@ export function registerArticleTools(server: McpServer, client: ZendeskClient): 
           : `/help_center/articles/${article_id}`;
 
         const article: Record<string, unknown> = {};
+        if (section_id !== undefined) article.section_id = section_id;
         if (title !== undefined) article.title = title;
         if (body !== undefined) article.body = body;
+        if (author_id !== undefined) article.author_id = author_id;
         if (draft !== undefined) article.draft = draft;
         if (promoted !== undefined) article.promoted = promoted;
         if (position !== undefined) article.position = position;
+        if (comments_disabled !== undefined) article.comments_disabled = comments_disabled;
+        if (content_tag_ids !== undefined) article.content_tag_ids = content_tag_ids;
         if (user_segment_id !== undefined) article.user_segment_id = user_segment_id;
+        if (user_segment_ids !== undefined) article.user_segment_ids = user_segment_ids;
         if (permission_group_id !== undefined) article.permission_group_id = permission_group_id;
         if (label_names !== undefined) article.label_names = label_names;
 
