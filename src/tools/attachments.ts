@@ -44,18 +44,21 @@ export function registerAttachmentTools(server: McpServer, client: ZendeskClient
     },
     async ({ content_type, file_size }) => {
       try {
-        const resp = await client.request<{ id: string; url: string }>(
+        const resp = await client.request<{
+          upload_url: { url: string; asset_upload_id: string };
+          headers: Record<string, string>;
+        }>(
           'POST',
           '/guide/medias/upload_url',
           { content_type, file_size },
         );
         return ok({
-          upload_id: resp.id,
-          upload_url: resp.url,
-          content_type,
+          upload_id: resp.upload_url.asset_upload_id,
+          upload_url: resp.upload_url.url,
+          upload_headers: resp.headers,
           instructions: [
             `PUT the raw file bytes to upload_url.`,
-            `Set Content-Type: ${content_type} on the PUT request.`,
+            `Include all key-value pairs from upload_headers as HTTP headers on the PUT request.`,
             `Do not send an Authorization header to the upload_url.`,
             `Then call finalize_article_attachment with the upload_id.`,
           ],
