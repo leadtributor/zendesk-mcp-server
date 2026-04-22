@@ -16,13 +16,9 @@ export interface TokenPayload {
   token: string;
 }
 
-export async function createToken(
-  credentials: TokenPayload,
-  expiresInSeconds = 28800,
-): Promise<string> {
+export async function createToken(credentials: TokenPayload): Promise<string> {
   return new EncryptJWT({ ...credentials })
     .setProtectedHeader({ alg: 'dir', enc: 'A256GCM' })
-    .setExpirationTime(Math.floor(Date.now() / 1000) + expiresInSeconds)
     .encrypt(ENC_KEY);
 }
 

@@ -204,6 +204,5 @@ oauthRouter.post('/token', express.urlencoded({ extended: false }), express.json
   res.json({
     access_token: await createToken(stored.credentials),
     token_type: 'bearer',
-    expires_in: 28800,
   });
 });
