@@ -139,4 +139,108 @@ export function registerSectionTools(server: McpServer, client: ZendeskClient): 
       }
     },
   );
+
+  server.tool(
+    'list_section_translations',
+    'List all translations for a Help Center section.',
+    {
+      section_id: z.number().int().positive().describe('Section ID'),
+    },
+    async ({ section_id }) => {
+      try {
+        return ok(await client.request('GET', `/help_center/sections/${section_id}/translations`));
+      } catch (e) {
+        return err(e);
+      }
+    },
+  );
+
+  server.tool(
+    'get_section_translation',
+    'Get a specific translation of a Help Center section by locale.',
+    {
+      section_id: z.number().int().positive().describe('Section ID'),
+      locale: z.string().describe('Locale code, e.g. "de" or "en-us"'),
+    },
+    async ({ section_id, locale }) => {
+      try {
+        return ok(await client.request('GET', `/help_center/sections/${section_id}/translations/${locale}`));
+      } catch (e) {
+        return err(e);
+      }
+    },
+  );
+
+  server.tool(
+    'create_section_translation',
+    'Create a translation for a Help Center section.',
+    {
+      section_id: z.number().int().positive().describe('Section ID'),
+      locale: z.string().describe('Locale code, e.g. "de" or "en-us"'),
+      title: z.string().describe('Translated section name'),
+      body: z.string().optional().describe('Translated section description'),
+    },
+    async ({ section_id, locale, title, body }) => {
+      try {
+        const translation: Record<string, unknown> = { locale, title };
+        if (body !== undefined) translation.body = body;
+        return ok(await client.request('POST', `/help_center/sections/${section_id}/translations`, { translation }));
+      } catch (e) {
+        return err(e);
+      }
+    },
+  );
+
+  server.tool(
+    'update_section_translation',
+    'Update an existing translation of a Help Center section.',
+    {
+      section_id: z.number().int().positive().describe('Section ID'),
+      locale: z.string().describe('Locale code of the translation to update'),
+      title: z.string().optional().describe('New translated section name'),
+      body: z.string().optional().describe('New translated section description'),
+    },
+    async ({ section_id, locale, title, body }) => {
+      try {
+        const translation: Record<string, unknown> = {};
+        if (title !== undefined) translation.title = title;
+        if (body !== undefined) translation.body = body;
+        return ok(await client.request('PUT', `/help_center/sections/${section_id}/translations/${locale}`, { translation }));
+      } catch (e) {
+        return err(e);
+      }
+    },
+  );
+
+  server.tool(
+    'delete_section_translation',
+    'Delete a specific translation of a Help Center section.',
+    {
+      section_id: z.number().int().positive().describe('Section ID'),
+      locale: z.string().describe('Locale code of the translation to delete'),
+    },
+    async ({ section_id, locale }) => {
+      try {
+        await client.request('DELETE', `/help_center/sections/${section_id}/translations/${locale}`);
+        return ok({ message: `Translation "${locale}" for section ${section_id} deleted.` });
+      } catch (e) {
+        return err(e);
+      }
+    },
+  );
+
+  server.tool(
+    'list_missing_section_translations',
+    'List locales that have no translation for a Help Center section.',
+    {
+      section_id: z.number().int().positive().describe('Section ID'),
+    },
+    async ({ section_id }) => {
+      try {
+        return ok(await client.request('GET', `/help_center/sections/${section_id}/translations/missing`));
+      } catch (e) {
+        return err(e);
+      }
+    },
+  );
 }
